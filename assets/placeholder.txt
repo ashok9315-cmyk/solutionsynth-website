@@ -1,0 +1,31 @@
+# Assets Directory
+
+This directory contains the following assets for the Synth AI Solution website:
+
+## Required Assets:
+- logo.svg - Company logo
+- favicon.ico - Website favicon
+- og-image.jpg - Open Graph image for social media sharing (1200x675px)
+- about-illustration.svg - Illustration for about section
+- carbonlens-preview.jpg - Screenshot/preview of CarbonLens AI application
+- profolia-preview.jpg - Screenshot/preview of Profolia website
+- founder-photo.jpg - Professional photo of Ashok S (250x250px recommended)
+
+## Asset Guidelines:
+- Use high-quality images (at least 1080p for photos)
+- Optimize file sizes for web performance
+- Use SVG format for logos and illustrations when possible
+- Ensure all images have appropriate alt text in HTML
+- Follow brand colors: Primary gradient (#667eea to #764ba2)
+
+## Temporary Placeholders:
+Until actual assets are provided, the website will use:
+- CSS gradients for missing images
+- Font Awesome icons as placeholders
+- Placeholder text and colors
+
+## Asset Sources:
+- Logo: Create or provide company logo in SVG format
+- Photos: Professional photography or stock images
+- Illustrations: Custom illustrations or royalty-free graphics
+- Screenshots: Actual application screenshots

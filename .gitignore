@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+secrets.json
+config.secret.*
+
+# AWS Credentials & Config
+.aws/
+aws-credentials*
+*-credentials.json
+
+# Build outputs
+dist/
+build/
+
+# AWS
+.aws-sam/
+samconfig.toml
+
+# Temporary files
+*.tmp
+*.temp
