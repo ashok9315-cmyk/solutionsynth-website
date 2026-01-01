@@ -14,6 +14,7 @@ This is a modern, responsive static website built for Synth AI Solution, featuri
 - **Services**: AI Solutions, Cloud Computing, Web Development, E-Commerce, Portfolio Generation, Mobile Apps
 - **Featured Products**: 
   - [CarbonLens AI](https://carbonlens-ai.solutionsynth.cloud) - Intelligent supply chain carbon footprint tracker
+  - [AI CV Maker](https://resume-generator-ai.solutionsynth.cloud/) - Intelligent resume generator powered by AI
   - [Profolia](https://www.profolia.art) - Professional online portfolio creation platform
 - **Founder Profile**: Ashok S - Founder & CEO
 - **Contact Information**: Direct contact methods and inquiry form
@@ -155,6 +156,7 @@ The website includes the following assets:
 - `assets/logo.svg` - Company logo
 - `assets/favicon.svg` - Website favicon
 - `assets/carbonlens-preview.jpg` - CarbonLens AI screenshot
+- `assets/AI Resume Generator-preview.jpg` - AI CV Maker screenshot
 - `assets/profolia-preview.jpg` - Profolia screenshot
 - `assets/founder-photo.jpg` - Founder photo (250x250px)
 
@@ -205,6 +207,7 @@ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 ## 🔗 Related Projects
 
 - **[CarbonLens AI](https://carbonlens-ai.solutionsynth.cloud)**: Intelligent supply chain carbon footprint tracker
+- **[AI CV Maker](https://resume-generator-ai.solutionsynth.cloud/)**: Intelligent resume generator powered by AI
 - **[Profolia](https://www.profolia.art)**: Professional online portfolio creation platform
 
 ## 📄 License
