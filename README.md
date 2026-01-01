@@ -33,17 +33,21 @@ This is a modern, responsive static website built for Synth AI Solution, featuri
 
 ```
 solutionsynth-website/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml             # GitHub Actions deployment workflow
 ├── index.html                     # Main HTML file
 ├── error.html                     # Custom 404 error page
 ├── styles/
 │   └── main.css                   # Main stylesheet
 ├── scripts/
 │   ├── main.js                    # JavaScript functionality
-│   └── deploy-website.ps1         # Deployment script
+│   └── deploy-website.ps1         # Manual deployment script
 ├── assets/
 │   ├── logo.svg                   # Company logo
 │   ├── favicon.svg                # Website favicon
 │   ├── carbonlens-preview.jpg     # CarbonLens AI screenshot
+│   ├── AI Resume Generator-preview.jpg # AI CV Maker screenshot
 │   ├── profolia-preview.jpg       # Profolia screenshot
 │   ├── founder-photo.jpg          # Founder photo
 │   └── placeholder.txt            # Asset requirements and guidelines
@@ -106,14 +110,27 @@ solutionsynth-website/
 
 ## 🚀 Deployment
 
-### AWS Infrastructure
-The website is hosted on AWS using:
-- **S3**: Static file hosting
-- **CloudFront**: Global CDN for fast delivery
-- **Route 53**: DNS management
-- **Certificate Manager**: SSL/TLS certificates
+### Automated Deployment (Recommended)
+The website uses GitHub Actions for automatic deployment on every push to the main branch.
 
-### Deployment Process
+**Setup:**
+1. Add AWS credentials to GitHub repository secrets:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+
+2. Push changes to the main branch - deployment happens automatically
+
+**GitHub Actions Workflow:**
+- Validates CloudFormation template
+- Deploys/updates AWS infrastructure
+- Uploads website files to S3
+- Invalidates CloudFront cache
+- Provides deployment summary
+
+### Manual Deployment
+You can also deploy manually using the PowerShell script:
+
+### Manual Deployment Process
 
 1. **Prerequisites**:
    ```powershell
@@ -128,7 +145,18 @@ The website is hosted on AWS using:
    .\scripts\deploy-website.ps1
    ```
 
-3. **Manual Deployment** (if needed):
+### AWS Infrastructure
+The website is hosted on AWS using:
+- **S3**: Static file hosting
+- **CloudFront**: Global CDN for fast delivery
+- **Route 53**: DNS management
+- **Certificate Manager**: SSL/TLS certificates
+
+### CI/CD Pipeline
+- **GitHub Actions**: Automated deployment on push to main branch
+- **AWS CLI**: Infrastructure and file deployment
+- **CloudFormation**: Infrastructure as Code
+- **Cache Invalidation**: Automatic CDN cache clearing
    ```powershell
    # Deploy CloudFormation stack
    aws cloudformation create-stack \

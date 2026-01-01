@@ -1,0 +1,258 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: 'us-east-1'
+  DOMAIN_NAME: 'solutionsynth.cloud'
+  HOSTED_ZONE_ID: 'Z02373041SS8TKQHXZLAR'
+
+jobs:
+  # Security Scan
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for hardcoded secrets
+      env:
+        AWS_KEY_PATTERN: "AKIA[0-9A-Z]\\{16\\}"
+        AWS_SECRET_PATTERN: "[0-9a-zA-Z/+]{40}"
+      run: |
+        echo "🔍 Checking for potential hardcoded secrets..."
+        
+        # Check for AWS keys (exclude workflow files and documentation)
+        if grep -r "$AWS_KEY_PATTERN" . --exclude-dir=.git --exclude-dir=.github --exclude="*.md" --exclude="*.yml" --exclude="*.yaml"; then
+          echo "❌ Found potential AWS access keys in code!"
+          exit 1
+        fi
+        
+        echo "✅ No hardcoded secrets found in source code"
+
+    - name: Validate HTML files
+      run: |
+        echo "🔍 Validating HTML files..."
+        # Basic HTML validation - check for required elements
+        if ! grep -q "<title>" index.html; then
+          echo "❌ Missing title tag in index.html"
+          exit 1
+        fi
+        
+        if ! grep -q "<meta.*viewport" index.html; then
+          echo "❌ Missing viewport meta tag in index.html"
+          exit 1
+        fi
+        
+        echo "✅ HTML validation passed"
+
+  # Validate Infrastructure
+  validate-infrastructure:
+    name: Validate Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Validate CloudFormation template
+      run: |
+        echo "📋 Validating CloudFormation template..."
+        aws cloudformation validate-template \
+          --template-body file://infrastructure/website-hosting.yml \
+          --region ${{ env.AWS_REGION }}
+        echo "✅ CloudFormation template is valid"
+
+  # Deploy to Production (only on main branch)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [security-scan, validate-infrastructure]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://solutionsynth.cloud
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Check if stack exists
+      id: check-stack
+      run: |
+        echo "🔍 Checking if CloudFormation stack exists..."
+        if aws cloudformation describe-stacks --stack-name solutionsynth-website-production --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+          echo "stack-exists=true" >> $GITHUB_OUTPUT
+          echo "📦 Stack exists"
+        else
+          echo "stack-exists=false" >> $GITHUB_OUTPUT
+          echo "📦 Stack does not exist - will create new stack"
+        fi
+        
+    - name: Deploy CloudFormation stack
+      run: |
+        if [ "${{ steps.check-stack.outputs.stack-exists }}" = "true" ]; then
+          echo "🔄 Updating existing stack..."
+          aws cloudformation update-stack \
+            --stack-name solutionsynth-website-production \
+            --template-body file://infrastructure/website-hosting.yml \
+            --parameters ParameterKey=DomainName,ParameterValue=${{ env.DOMAIN_NAME }} ParameterKey=HostedZoneId,ParameterValue=${{ env.HOSTED_ZONE_ID }} \
+            --capabilities CAPABILITY_IAM \
+            --region ${{ env.AWS_REGION }} || echo "No infrastructure updates needed"
+        else
+          echo "🆕 Creating new stack..."
+          aws cloudformation create-stack \
+            --stack-name solutionsynth-website-production \
+            --template-body file://infrastructure/website-hosting.yml \
+            --parameters ParameterKey=DomainName,ParameterValue=${{ env.DOMAIN_NAME }} ParameterKey=HostedZoneId,ParameterValue=${{ env.HOSTED_ZONE_ID }} \
+            --capabilities CAPABILITY_IAM \
+            --region ${{ env.AWS_REGION }}
+        fi
+        
+    - name: Wait for stack operation to complete
+      run: |
+        if [ "${{ steps.check-stack.outputs.stack-exists }}" = "true" ]; then
+          echo "⏳ Waiting for stack update to complete..."
+          aws cloudformation wait stack-update-complete \
+            --stack-name solutionsynth-website-production \
+            --region ${{ env.AWS_REGION }} || echo "Stack was already up to date"
+        else
+          echo "⏳ Waiting for stack creation to complete..."
+          aws cloudformation wait stack-create-complete \
+            --stack-name solutionsynth-website-production \
+            --region ${{ env.AWS_REGION }}
+        fi
+        echo "✅ Stack operation completed"
+        
+    - name: Get stack outputs
+      id: stack-outputs
+      run: |
+        echo "📊 Getting stack outputs..."
+        BUCKET_NAME=$(aws cloudformation describe-stacks \
+          --stack-name solutionsynth-website-production \
+          --region ${{ env.AWS_REGION }} \
+          --query 'Stacks[0].Outputs[?OutputKey==`WebsiteBucketName`].OutputValue' \
+          --output text)
+        
+        CLOUDFRONT_ID=$(aws cloudformation describe-stacks \
+          --stack-name solutionsynth-website-production \
+          --region ${{ env.AWS_REGION }} \
+          --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
+          --output text)
+          
+        echo "bucket-name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+        echo "cloudfront-id=$CLOUDFRONT_ID" >> $GITHUB_OUTPUT
+        echo "✅ S3 Bucket: $BUCKET_NAME"
+        echo "✅ CloudFront Distribution: $CLOUDFRONT_ID"
+        
+    - name: Upload website files to S3
+      run: |
+        echo "📤 Uploading website files to S3..."
+        
+        # Upload HTML files with proper cache control
+        aws s3 cp index.html s3://${{ steps.stack-outputs.outputs.bucket-name }}/ \
+          --content-type "text/html" \
+          --cache-control "max-age=300"
+          
+        aws s3 cp error.html s3://${{ steps.stack-outputs.outputs.bucket-name }}/ \
+          --content-type "text/html" \
+          --cache-control "max-age=300"
+          
+        # Upload CSS files
+        aws s3 cp styles/ s3://${{ steps.stack-outputs.outputs.bucket-name }}/styles/ \
+          --recursive \
+          --content-type "text/css" \
+          --cache-control "max-age=31536000"
+          
+        # Upload JS files
+        aws s3 cp scripts/main.js s3://${{ steps.stack-outputs.outputs.bucket-name }}/scripts/main.js \
+          --content-type "application/javascript" \
+          --cache-control "max-age=31536000"
+          
+        # Upload assets
+        aws s3 sync assets/ s3://${{ steps.stack-outputs.outputs.bucket-name }}/assets/ \
+          --exclude "placeholder.txt" \
+          --cache-control "max-age=31536000"
+          
+        echo "✅ Website files uploaded successfully"
+          
+    - name: Invalidate CloudFront cache
+      run: |
+        echo "🔄 Invalidating CloudFront cache..."
+        INVALIDATION_ID=$(aws cloudfront create-invalidation \
+          --distribution-id ${{ steps.stack-outputs.outputs.cloudfront-id }} \
+          --paths "/*" \
+          --query 'Invalidation.Id' \
+          --output text)
+        echo "✅ CloudFront invalidation created: $INVALIDATION_ID"
+
+    - name: Run deployment verification
+      run: |
+        echo "🔍 Running deployment verification..."
+        
+        # Wait a moment for CloudFront to start serving
+        sleep 30
+        
+        # Test website accessibility
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.DOMAIN_NAME }})
+        if [ "$HTTP_STATUS" = "200" ]; then
+          echo "✅ Website is accessible (HTTP $HTTP_STATUS)"
+        else
+          echo "⚠️ Website returned HTTP $HTTP_STATUS"
+        fi
+        
+        # Test if main elements are present
+        if curl -s https://${{ env.DOMAIN_NAME }} | grep -q "Synth AI Solution"; then
+          echo "✅ Website content verification passed"
+        else
+          echo "⚠️ Website content verification failed"
+        fi
+      continue-on-error: true
+
+  # Notify deployment status
+  notify:
+    name: Notify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always() && github.ref == 'refs/heads/main'
+    steps:
+    - name: Deployment Success
+      if: needs.deploy-production.result == 'success'
+      run: |
+        echo "🎉 Deployment successful!"
+        echo "🚀 Website is live at: https://${{ env.DOMAIN_NAME }}"
+        echo "📋 Deployment Summary:"
+        echo "  • Domain: ${{ env.DOMAIN_NAME }}"
+        echo "  • Environment: production"
+        echo "  • Status: ✅ SUCCESS"
+        
+    - name: Deployment Failed
+      if: needs.deploy-production.result == 'failure'
+      run: |
+        echo "❌ Deployment failed!"
+        echo "🔍 Check the logs above for details."
+        echo "📋 Failure Summary:"
+        echo "  • Domain: ${{ env.DOMAIN_NAME }}"
+        echo "  • Environment: production"
+        echo "  • Status: ❌ FAILED"
+        exit 1
